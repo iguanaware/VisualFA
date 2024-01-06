@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using F;
-
+using System.Text.RegularExpressions;
 namespace CompileDemo
 {
 	internal class Program
@@ -34,6 +34,46 @@ namespace CompileDemo
 					Console.Write(_block);
 			}
 			Console.Write("] {0,3:##0}%", percent);
+		}
+		static void _RunMS()
+		{
+			var expr = string.Join("|", _exprs);
+			Regex rx = new Regex(expr);
+			var e = rx.Matches(_search).GetEnumerator();
+			while (e.MoveNext()) ;
+			Stopwatch sw = new Stopwatch();
+			sw.Start();
+			Console.Write("Microsoft Regex \"Lexer\": ");
+			_WriteProgressBar(0);
+			for (int i = 0; i < _iterations; ++i)
+			{
+				e = rx.Matches(_search).GetEnumerator();
+				while (e.MoveNext()) ;
+				_WriteProgressBar(i / _divisor, true);
+			}
+			_WriteProgressBar(100, true);
+			sw.Stop();
+			Console.WriteLine(" Done in {0}ms", sw.ElapsedMilliseconds);
+		}
+		static void _RunMSCompiled()
+		{
+			var expr = string.Join("|", _exprs);
+			Regex rx = new Regex(expr,RegexOptions.Compiled);
+			var e = rx.Matches(_search).GetEnumerator();
+			while (e.MoveNext()) ;
+			Stopwatch sw = new Stopwatch();
+			sw.Start();
+			Console.Write("Microsoft Regex Compiled \"Lexer\": ");
+			_WriteProgressBar(0);
+			for (int i = 0; i < _iterations; ++i)
+			{
+				e = rx.Matches(_search).GetEnumerator();
+				while (e.MoveNext()) ;
+				_WriteProgressBar(i / _divisor, true);
+			}
+			_WriteProgressBar(100, true);
+			sw.Stop();
+			Console.WriteLine(" Done in {0}ms", sw.ElapsedMilliseconds);
 		}
 		static void _RunExpandedNfa()
 		{
@@ -219,6 +259,8 @@ namespace CompileDemo
 #endif
 			for (int i = 0; i < _times; ++i)
 			{
+				_RunMS();
+				_RunMSCompiled();
 				_RunExpandedNfa();
 				_RunCompactNfa();
 				_RunUnoptimizedDfa();
@@ -244,8 +286,8 @@ namespace CompileDemo
 		}
 		static void Main()
 		{
-			_TestMatch();
-			//_Bench();
+			//_TestMatch();
+			_Bench();
 		}
 	}
 }
