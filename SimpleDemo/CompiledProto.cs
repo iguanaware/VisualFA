@@ -48,6 +48,7 @@ namespace F
 		q1:
 			if (codepoint == ' ')
 			{
+				codepoint = lc.Advance();
 				goto q1;
 			}
 			return (lc.Current == LexContext.EndOfInput ? 0 : -1);
