@@ -40,7 +40,7 @@ namespace CompileDemo
 			var exprs = new FA[_exprs.Length];
 			for (var i = 0;i<exprs.Length; ++i)
 			{
-				exprs[i]= FA.Parse(_exprs[i], 0, false);
+				exprs[i]= FA.Parse(_exprs[i], i, false);
 			}
 			var lexer = FA.ToLexer(exprs, false);
 			using(IEnumerator<FAMatch> e = lexer.Search(_search).GetEnumerator())
@@ -68,7 +68,7 @@ namespace CompileDemo
 			var exprs = new FA[_exprs.Length];
 			for (var i = 0; i < exprs.Length; ++i)
 			{
-				exprs[i] = FA.Parse(_exprs[i], 0, false);
+				exprs[i] = FA.Parse(_exprs[i], i, false);
 			}
 			var lexer = FA.ToLexer(exprs, false);
 			lexer.Compact();
@@ -97,7 +97,7 @@ namespace CompileDemo
 			var exprs = new FA[_exprs.Length];
 			for (var i = 0; i < exprs.Length; ++i)
 			{
-				exprs[i] = FA.Parse(_exprs[i], 0, false);
+				exprs[i] = FA.Parse(_exprs[i], i, false);
 			}
 			var lexer = FA.ToLexer(exprs, false);
 			lexer.ToDfa();
@@ -126,7 +126,7 @@ namespace CompileDemo
 			var exprs = new FA[_exprs.Length];
 			for (var i = 0; i < exprs.Length; ++i)
 			{
-				exprs[i] = FA.Parse(_exprs[i], 0);
+				exprs[i] = FA.Parse(_exprs[i], i);
 			}
 			var lexer = FA.ToLexer(exprs, true);
 			using (IEnumerator<FAMatch> e = lexer.Search(_search).GetEnumerator())
@@ -154,7 +154,7 @@ namespace CompileDemo
 			var exprs = new FA[_exprs.Length];
 			for (var i = 0; i < exprs.Length; ++i)
 			{
-				exprs[i] = FA.Parse(_exprs[i], 0, false);
+				exprs[i] = FA.Parse(_exprs[i], i);
 			}
 			var lexer = FA.ToLexer(exprs, true);
 			var table = lexer.ToArray();
@@ -183,7 +183,7 @@ namespace CompileDemo
 			var exprs = new FA[_exprs.Length];
 			for (var i = 0; i < exprs.Length; ++i)
 			{
-				exprs[i] = FA.Parse(_exprs[i], 0, false);
+				exprs[i] = FA.Parse(_exprs[i], i);
 			}
 			var lexer = FA.ToLexer(exprs, true);
 			var runner = lexer.Compile();
@@ -207,7 +207,7 @@ namespace CompileDemo
 			sw.Stop();
 			Console.WriteLine(" Done in {0}ms", sw.ElapsedMilliseconds);
 		}
-		static void Main()
+		static void _Bench()
 		{
 			using(var sw = new StreamReader(@"..\..\Program.cs"))
 			{
@@ -228,6 +228,24 @@ namespace CompileDemo
 				Console.WriteLine();
 			}
 		}
-		
+		static void _TestMatch()
+		{
+			var exprs = new FA[_exprs.Length];
+			for (var i = 0; i < exprs.Length; ++i)
+			{
+				exprs[i] = FA.Parse(_exprs[i], i, false);
+			}
+			var lexer = FA.ToLexer(exprs, true);
+			var runner = lexer.Compile();
+			foreach (var s in "The quick brown fox jumped over -10 the #*(@$& lazy dog".Split(' '))
+			{
+				Console.WriteLine("Match {0}: {1}",s,runner.Match(s));
+			}
+		}
+		static void Main()
+		{
+			_TestMatch();
+			//_Bench();
+		}
 	}
 }

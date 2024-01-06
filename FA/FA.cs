@@ -147,6 +147,7 @@ namespace F
 		/// <returns>The accept symbol if matched, otherwise -1.</returns>
 		public int Match(LexContext lc)
 		{
+			lc.EnsureStarted();
 			return MatchImpl(lc);
 		}
 		/// <summary>

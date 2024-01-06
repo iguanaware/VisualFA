@@ -56,7 +56,7 @@ namespace F
 					break;
 			}
 		}
-		private static void _GenerateRangesExpression(ILGenerator il, bool ismatch, Label dest, Label final, int[] ranges)
+		private static void _GenerateRangesExpression(ILGenerator il, bool ismatch, Label trueLabel, Label falseLabel, int[] ranges)
 		{
 			for (int i = 0; i < ranges.Length; i+=2)
 			{
@@ -67,20 +67,20 @@ namespace F
 				{
 					il.Emit(ismatch?OpCodes.Ldloc_0: OpCodes.Ldloc_3);
 					_EmitConst(il, first);
-					il.Emit(OpCodes.Blt, final);
+					il.Emit(OpCodes.Blt, falseLabel);
 					il.Emit(ismatch ? OpCodes.Ldloc_0 : OpCodes.Ldloc_3);
 					_EmitConst(il, last);
-					il.Emit(OpCodes.Ble, dest);
+					il.Emit(OpCodes.Ble, trueLabel);
 				} else
 				{
 					il.Emit(ismatch ? OpCodes.Ldloc_0 : OpCodes.Ldloc_3);
 					_EmitConst(il, first);
-					il.Emit(OpCodes.Beq, dest);
+					il.Emit(OpCodes.Beq, trueLabel);
 
 				}
 				il.MarkLabel(next); 
 			}
-			il.Emit(OpCodes.Br, final);
+			il.Emit(OpCodes.Br, falseLabel);
 		}
 		private static Label[] _DeclareLabelsForStates(ILGenerator il, IList<FA> closure)
 		{
@@ -106,11 +106,11 @@ namespace F
 			il.Emit(OpCodes.Ldstr, str);
 			il.EmitCall(OpCodes.Call, _ZDbgW, null);
 		}
-		private static void _DbgOutCP(ILGenerator il)
+		private static void _DbgOutCP(ILGenerator il,bool ismatch)
 		{
 			var cw = typeof(Console).GetMethod("Write", BindingFlags.Static | BindingFlags.Public, null, new Type[] { typeof(string) }, null);
 			var cvt = typeof(char).GetMethod("ConvertFromUtf32");
-			il.Emit(OpCodes.Ldloc_3);
+			il.Emit(ismatch?OpCodes.Ldloc_0:OpCodes.Ldloc_3);
 			il.EmitCall(OpCodes.Call, cvt, null);
 			il.EmitCall(OpCodes.Call,cw, null);
 		}
@@ -130,19 +130,28 @@ namespace F
 			PropertyInfo lccol = typeof(LexContext).GetProperty("Column");
 			PropertyInfo lccur = typeof(LexContext).GetProperty("Current");
 			PropertyInfo lccapb = typeof(LexContext).GetProperty("CaptureBuffer");
-			MethodInfo lccapbts = typeof(StringBuilder).GetMethod("ToString", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
 			MethodInfo lcadv = typeof(LexContext).GetMethod("Advance");
 			MethodInfo lccap = typeof(LexContext).GetMethod("Capture");
 			MethodInfo lccc = typeof(LexContext).GetMethod("ClearCapture");
+			MethodInfo sbts = typeof(StringBuilder).GetMethod("ToString", 
+				BindingFlags.Public | BindingFlags.Instance, 
+				null, 
+				Type.EmptyTypes, 
+				null);
+			MethodInfo createMatch = typeof(FAMatch).GetMethod("Create", 
+				BindingFlags.Static | BindingFlags.Public);
 
 			Type[] paramTypes = new Type[] { typeof(LexContext) };
+
 			Type searchReturnType = typeof(FAMatch);
-			MethodBuilder searchImpl = type.DefineMethod("SearchImpl", MethodAttributes.Public | MethodAttributes.ReuseSlot |
-				MethodAttributes.Virtual | MethodAttributes.HideBySig, searchReturnType, paramTypes);
-			
+			MethodBuilder searchImpl = type.DefineMethod("SearchImpl", 
+				MethodAttributes.Public | MethodAttributes.ReuseSlot |
+				MethodAttributes.Virtual | MethodAttributes.HideBySig, 
+				searchReturnType, 
+				paramTypes);
+
 			ILGenerator il = searchImpl.GetILGenerator();
 			
-			MethodInfo createMatch = typeof(FAMatch).GetMethod("Create",BindingFlags.Static| BindingFlags.Public);
 			
 			il.DeclareLocal(typeof(long)); // position 0
 			il.DeclareLocal(typeof(int)); // line 1
@@ -212,7 +221,7 @@ namespace F
 					_EmitConst(il, cfa.AcceptSymbol);
 					il.Emit(OpCodes.Ldarg_1);
 					il.EmitCall(OpCodes.Callvirt, lccapb.GetGetMethod(), null);
-					il.EmitCall(OpCodes.Callvirt, lccapbts, null);
+					il.EmitCall(OpCodes.Callvirt, sbts, null);
 					il.Emit(OpCodes.Ldloc_0);
 					il.Emit(OpCodes.Ldloc_1);
 					il.Emit(OpCodes.Ldloc_2);
@@ -248,22 +257,24 @@ namespace F
 			type.DefineMethodOverride(searchImpl, searchImplBase);
 
 			Type matchReturnType = typeof(int);
-			MethodBuilder match = type.DefineMethod("MatchImpl", MethodAttributes.Public | MethodAttributes.ReuseSlot |
-				MethodAttributes.Virtual | MethodAttributes.HideBySig, matchReturnType, paramTypes);
+			MethodBuilder match = type.DefineMethod("MatchImpl", 
+				MethodAttributes.Public | MethodAttributes.ReuseSlot |
+				MethodAttributes.Virtual | MethodAttributes.HideBySig, 
+				matchReturnType, 
+				paramTypes);
 			il = match.GetILGenerator();
 
 			il.DeclareLocal(typeof(int)); // current 0
 
 			states = _DeclareLabelsForStates(il, closure);
-			start_machine = il.DefineLabel();
-
+			
 			il.Emit(OpCodes.Ldarg_1);
 			il.EmitCall(OpCodes.Call, lccur.GetGetMethod(), null);
 			il.Emit(OpCodes.Stloc_0);
 			il.Emit(OpCodes.Ldloc_0);
 			il.Emit(OpCodes.Ldc_I4_M1);
 			il.Emit(OpCodes.Ceq);
-			il.Emit(OpCodes.Brfalse_S, start_machine);
+			il.Emit(OpCodes.Brfalse_S, states[0]);
 
 			retEmpty = il.DefineLabel();
 			il.MarkLabel(retEmpty);
@@ -277,8 +288,6 @@ namespace F
 				il.Emit(OpCodes.Ret);
 			}
 
-			il.MarkLabel(start_machine);
-
 			for (int i = 0; i < closure.Count; ++i)
 			{
 				var cfa = closure[i];
@@ -287,18 +296,17 @@ namespace F
 				int j = 0;
 				foreach (var trn in trnsgrp)
 				{
-					var dest = il.DefineLabel();
-					var final = il.DefineLabel();
-					_GenerateRangesExpression(il, true, dest, final, trn.Value);
-
-					il.MarkLabel(dest);
+					var foundMatch = il.DefineLabel();
+					var tryNextStateRanges = il.DefineLabel();
+					_GenerateRangesExpression(il, true, foundMatch, tryNextStateRanges, trn.Value);
 					// matched
+					il.MarkLabel(foundMatch);
 					var si = closure.IndexOf(trn.Key);
 					il.Emit(OpCodes.Ldarg_1);
 					il.EmitCall(OpCodes.Callvirt, lcadv, null);
 					il.Emit(OpCodes.Stloc_0);
 					il.Emit(OpCodes.Br, states[si]);
-					il.MarkLabel(final);
+					il.MarkLabel(tryNextStateRanges);
 					++j;
 				}
 				// not matched
@@ -316,13 +324,8 @@ namespace F
 				}
 				else
 				{
-					il.Emit(OpCodes.Ldarg_1);
-					il.EmitCall(OpCodes.Callvirt, lcadv, null);
-					il.Emit(OpCodes.Stloc_0);
-					il.Emit(OpCodes.Ldc_I4_M1);
-					il.Emit(OpCodes.Ldloc_0);
-					il.Emit(OpCodes.Beq, retEmpty);
-					il.Emit(OpCodes.Br, states[0]);
+					_EmitConst(il, -1);
+					il.Emit(OpCodes.Ret);
 				}
 			}
 			il.Emit(OpCodes.Br, retEmpty);
