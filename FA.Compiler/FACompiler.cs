@@ -287,36 +287,39 @@ namespace F
 				_EmitConst(il, -1);
 				il.Emit(OpCodes.Ret);
 			}
-
-			for (int i = 0; i < closure.Count; ++i)
+			// for each state
+			for (int q = 0; q < closure.Count; ++q)
 			{
-				var cfa = closure[i];
-				il.MarkLabel(states[i]);
-				var trnsgrp = cfa.FillInputTransitionRangesGroupedByState();
-				int j = 0;
+				// mark the current state
+				var fromState = closure[q];
+				il.MarkLabel(states[q]); 
+				// get the transition ranges grouped 
+				// by the state they transition to
+				var trnsgrp = fromState.FillInputTransitionRangesGroupedByState();
 				foreach (var trn in trnsgrp)
 				{
 					var foundMatch = il.DefineLabel();
 					var tryNextStateRanges = il.DefineLabel();
-					_GenerateRangesExpression(il, true, foundMatch, tryNextStateRanges, trn.Value);
+					var trnsTo = trn.Key;
+					var trnsRngs = trn.Value;
+					_GenerateRangesExpression(il, true, foundMatch, tryNextStateRanges, trnsRngs);
 					// matched
 					il.MarkLabel(foundMatch);
-					var si = closure.IndexOf(trn.Key);
+					var toIndex = closure.IndexOf(trnsTo);
 					il.Emit(OpCodes.Ldarg_1);
 					il.EmitCall(OpCodes.Callvirt, lcadv, null);
 					il.Emit(OpCodes.Stloc_0);
-					il.Emit(OpCodes.Br, states[si]);
+					il.Emit(OpCodes.Br, states[toIndex]);
 					il.MarkLabel(tryNextStateRanges);
-					++j;
 				}
 				// not matched
-				if (cfa.IsAccepting)
+				if (fromState.IsAccepting)
 				{
 					il.Emit(OpCodes.Ldloc_0);
 					_EmitConst(il,-1);
 					var no_eof = il.DefineLabel();
 					il.Emit(OpCodes.Bgt,no_eof);
-					_EmitConst(il, cfa.AcceptSymbol);
+					_EmitConst(il, fromState.AcceptSymbol);
 					il.Emit(OpCodes.Ret);
 					il.MarkLabel(no_eof);
 					_EmitConst(il, -1);
@@ -328,7 +331,6 @@ namespace F
 					il.Emit(OpCodes.Ret);
 				}
 			}
-			il.Emit(OpCodes.Br, retEmpty);
 			MethodInfo matchBase = typeof(FARunner).GetMethod("MatchImpl", BindingFlags.NonPublic | BindingFlags.Instance);
 			type.DefineMethodOverride(match, matchBase);
 
